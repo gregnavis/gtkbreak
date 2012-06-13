@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
         gtk_window_fullscreen(GTK_WINDOW(window));
 	screen = gtk_window_get_screen(GTK_WINDOW(window));
 	gtk_window_set_default_size(GTK_WINDOW(window),
-        gdk_screen_get_width(screen),
-        gdk_screen_get_height(screen));
+		gdk_screen_get_width(screen),
+		gdk_screen_get_height(screen));
 	g_signal_connect(window,
 		"motion_notify_event",
 		G_CALLBACK(drop_event),
