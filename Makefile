@@ -1,4 +1,4 @@
-CFLAGS=-std=c99 -W -Wall -pedantic `pkg-config --libs --cflags gtk+-2.0`
+CFLAGS=-std=c99 -W -Wall -Werror -pedantic `pkg-config --libs --cflags gtk+-2.0`
 
 BINARY=gtkbreak
 
