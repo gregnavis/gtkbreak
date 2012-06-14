@@ -64,6 +64,7 @@ static gboolean start_break(gpointer data)
 
 	sec = breaks[break_idx].break_sec;
 	gtk_widget_show_all(window);
+	gdk_keyboard_grab(window->window, TRUE, GDK_CURRENT_TIME);
 	update_timer();
 
 	g_timeout_add_seconds(1, break_tick, NULL);
@@ -102,7 +103,6 @@ static gboolean handle_input(GtkWidget *widget, GdkEvent *event, gpointer *data)
 		return FALSE;
 	}
 
-	gdk_keyboard_grab(window->window, TRUE, GDK_CURRENT_TIME);
 	return TRUE;
 }
 
@@ -145,13 +145,16 @@ int main(int argc, char *argv[])
 	gtk_set_locale();
 	gtk_init(&argc, &argv);
 
-	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	window = gtk_window_new(GTK_WINDOW_POPUP);
 	gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
 	gtk_window_fullscreen(GTK_WINDOW(window));
 	screen = gtk_window_get_screen(GTK_WINDOW(window));
 	gtk_window_set_default_size(GTK_WINDOW(window),
 		gdk_screen_get_width(screen),
 		gdk_screen_get_height(screen));
+	gtk_window_set_skip_pager_hint(GTK_WINDOW(window), TRUE);
+	gtk_window_set_skip_taskbar_hint(GTK_WINDOW(window), TRUE);
+	gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
 	g_signal_connect(window,
 		"motion_notify_event",
 		G_CALLBACK(handle_input),
