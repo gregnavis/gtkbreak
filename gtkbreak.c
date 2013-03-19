@@ -10,6 +10,10 @@
 /* Suppresses warnings about unused parameters. */
 #define unused(x) ((void) (x))
 
+/* The duration of additional dealy that serves as a penalty for pressing
+ * keys during a break. */
+static const int default_penalty_seconds = 3;
+
 /* A single work-break cycle. */
 
 struct cycle {
@@ -44,6 +48,9 @@ static int current_cycle_index = 0;
 /* Remaining time of work/break in seconds. */
 static int remaining_seconds = 0;
 
+/* Remaining time of penalty for pressing keys during a break. */
+static int penalty_seconds = 0;
+
 static gboolean break_tick(gpointer);
 
 /* Update the timer in the break window. */
@@ -52,18 +59,22 @@ static void update_timer(void)
 	struct cycle *cyclep = &cycles[current_cycle_index];
 	char *label, buf[256];
 
-	switch (remaining_seconds) {
-	case 0:
-		label = "Press any key to get back to work!";
-		break;
+	if (penalty_seconds) {
+		label = "You aren't supposed to be working now! Take a break!";
+	} else {
+		switch (remaining_seconds) {
+		case 0:
+			label = "Press any key to get back to work!";
+			break;
 
-	case 1:
-		label = "1 second remaining";
-		break;
+		case 1:
+			label = "1 second remaining";
+			break;
 
-	default:
-		snprintf(buf, sizeof(buf), "%d seconds remaining", remaining_seconds);
-		label = buf;
+		default:
+			snprintf(buf, sizeof(buf), "%d seconds remaining", remaining_seconds);
+			label = buf;
+		}
 	}
 
 
@@ -91,15 +102,21 @@ static gboolean start_break(gpointer data)
 /* Step the timer during a break. */
 static gboolean break_tick(gpointer data)
 {
+	gboolean continue_ticking;
+
 	(void)data;
 
-	remaining_seconds--;
-	update_timer();
-	if (remaining_seconds == 0) {
-		return FALSE;
+	if (penalty_seconds) {
+		penalty_seconds--;
+		continue_ticking = TRUE;
+	} else {
+		remaining_seconds--;
+		continue_ticking = (remaining_seconds != 0);
 	}
 
-	return TRUE;
+	update_timer();
+
+	return continue_ticking;
 }
 
 /* Handle input during a break.
@@ -122,6 +139,9 @@ static gboolean handle_input(GtkWidget *widget, GdkEvent *event, gpointer *data)
 		g_timeout_add_seconds(cycles[current_cycle_index].work_duration, start_break, NULL);
 
 		return FALSE;
+	} else {
+		penalty_seconds = default_penalty_seconds;
+		update_timer();
 	}
 
 	return TRUE;
