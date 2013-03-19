@@ -152,9 +152,11 @@ int main(int argc, char *argv[])
 	gtk_window_set_default_size(GTK_WINDOW(window),
 		gdk_screen_get_width(screen),
 		gdk_screen_get_height(screen));
+	gtk_window_resize(GTK_WINDOW(window),
+		gdk_screen_get_width(screen),
+		gdk_screen_get_height(screen));
 	gtk_window_set_skip_pager_hint(GTK_WINDOW(window), TRUE);
 	gtk_window_set_skip_taskbar_hint(GTK_WINDOW(window), TRUE);
-	gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
 	g_signal_connect(window,
 		"motion_notify_event",
 		G_CALLBACK(handle_input),
