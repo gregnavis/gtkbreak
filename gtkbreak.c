@@ -15,7 +15,6 @@
 static const int default_penalty_seconds = 3;
 
 /* A single work-break cycle. */
-
 struct cycle {
 	/* The duration of work in seconds. */
 	int work_duration;
