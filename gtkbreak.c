@@ -10,34 +10,49 @@
 /* Suppresses warnings about unused parameters. */
 #define unused(x) ((void) (x))
 
-struct break_info {
-	int work_sec;
-	int break_sec;
+/* A single work-break cycle. */
+
+struct cycle {
+	/* The duration of work in seconds. */
+	int work_duration;
+
+	/* The duration of a break in seconds. */
+	int break_duration;
 };
 
-static GtkWidget *window, *alignment, *timer;
+/* The break window that contains the timer. */
+static GtkWidget *window;
+
+/* The alignment used to position the timer. */
+static GtkWidget *alignment;
+
+/* The timer. */
+static GtkWidget *timer;
+
+/* The current screen. */
 static GdkScreen *screen;
 
-/* the number of breaks */
-static int nbreaks;
+/* The number of cycles. */
+static int cycles_count;
 
-/* the breaks */
-static struct break_info *breaks;
+/* The cycles. */
+static struct cycle *cycles;
 
-/* the current break */
-static int break_idx = 0;
+/* The index of the current cycle. */
+static int current_cycle_index = 0;
 
-/* remaining time */
-static int sec = 0;
+/* Remaining time of work/break in seconds. */
+static int remaining_seconds = 0;
 
 static gboolean break_tick(gpointer);
 
+/* Update the timer in the break window. */
 static void update_timer(void)
 {
-	struct break_info *breakp = &breaks[break_idx];
+	struct cycle *cyclep = &cycles[current_cycle_index];
 	char *label, buf[256];
 
-	switch (sec) {
+	switch (remaining_seconds) {
 	case 0:
 		label = "Press any key to get back to work!";
 		break;
@@ -47,22 +62,23 @@ static void update_timer(void)
 		break;
 
 	default:
-		snprintf(buf, sizeof(buf), "%d seconds remaining", sec);
+		snprintf(buf, sizeof(buf), "%d seconds remaining", remaining_seconds);
 		label = buf;
 	}
 
 
 	gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(timer),
-		1.0 - (gdouble) sec / breakp->break_sec);
+		1.0 - (gdouble) remaining_seconds / cyclep->break_duration);
 	gtk_progress_bar_set_text(GTK_PROGRESS_BAR(timer),
 		label);
 }
 
+/* Start a break. */
 static gboolean start_break(gpointer data)
 {
 	(void)data;
 
-	sec = breaks[break_idx].break_sec;
+	remaining_seconds = cycles[current_cycle_index].break_duration;
 	gtk_widget_show_all(window);
 	gdk_keyboard_grab(window->window, TRUE, GDK_CURRENT_TIME);
 	update_timer();
@@ -72,33 +88,38 @@ static gboolean start_break(gpointer data)
 	return FALSE;
 }
 
+/* Step the timer during a break. */
 static gboolean break_tick(gpointer data)
 {
 	(void)data;
 
-	sec--;
+	remaining_seconds--;
 	update_timer();
-	if (sec == 0) {
+	if (remaining_seconds == 0) {
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
+/* Handle input during a break.
+ *
+ * When the break is finished then close the window. Otherwise do nothing.
+ */
 static gboolean handle_input(GtkWidget *widget, GdkEvent *event, gpointer *data)
 {
 	unused(widget);
 	unused(event);
 	unused(data);
 
-	if (sec == 0) {
+	if (remaining_seconds == 0) {
 		gtk_widget_hide(window);
 
-		if(++break_idx == nbreaks) {
-			break_idx = 0;
+		if(++current_cycle_index == cycles_count) {
+			current_cycle_index = 0;
 		}
 
-		g_timeout_add_seconds(breaks[break_idx].work_sec, start_break, NULL);
+		g_timeout_add_seconds(cycles[current_cycle_index].work_duration, start_break, NULL);
 
 		return FALSE;
 	}
@@ -122,23 +143,23 @@ int main(int argc, char *argv[])
 		goto out;
 	}
 
-	nbreaks = (argc - 1) / 2;
+	cycles_count = (argc - 1) / 2;
 
-	breaks = malloc(sizeof(*breaks) * nbreaks);
-	if(!breaks) {
+	cycles = malloc(sizeof(*cycles) * cycles_count);
+	if(!cycles) {
 		perror("malloc");
 		res = EXIT_FAILURE;
 		goto out;
 	}
 
-	for(i = 0; i < nbreaks; i++) {
-		breaks[i].work_sec = atoi(argv[2 * i + 1]);
-		breaks[i].break_sec = atoi(argv[2 * i + 2]);
+	for(i = 0; i < cycles_count; i++) {
+		cycles[i].work_duration = atoi(argv[2 * i + 1]);
+		cycles[i].break_duration = atoi(argv[2 * i + 2]);
 
-		if(breaks[i].work_sec <= 0 || breaks[i].break_sec <= 0) {
+		if(cycles[i].work_duration <= 0 || cycles[i].break_duration <= 0) {
 			fprintf(stderr, "Error: time cannot be negative\n");
 			res = EXIT_FAILURE;
-			goto free_break_info;
+			goto free_cycle;
 		}
 	}
 
@@ -175,14 +196,14 @@ int main(int argc, char *argv[])
 	gtk_container_add(GTK_CONTAINER(alignment), timer);
 	gtk_container_add(GTK_CONTAINER(window), alignment);
 
-	g_timeout_add_seconds(breaks[0].work_sec, start_break, NULL);
+	g_timeout_add_seconds(cycles[0].work_duration, start_break, NULL);
 
 	gtk_main();
 
 	res = EXIT_SUCCESS;
 
-free_break_info:
-	free(breaks);
+free_cycle:
+	free(cycles);
 
 out:
 	return res;
