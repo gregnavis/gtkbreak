@@ -203,6 +203,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	remaining_seconds = cycles[0].work_duration;
+
 	gtk_set_locale();
 	gtk_init(&argc, &argv);
 
