@@ -10,6 +10,12 @@
 /* Suppresses warnings about unused parameters. */
 #define unused(x) ((void) (x))
 
+/* Available modes. */
+enum mode {
+	MODE_WORK,
+	MODE_BREAK
+};
+
 /* The duration of additional dealy that serves as a penalty for pressing
  * keys during a break. */
 static const int default_penalty_seconds = 3;
@@ -50,7 +56,10 @@ static int remaining_seconds = 0;
 /* Remaining time of penalty for pressing keys during a break. */
 static int penalty_seconds = 0;
 
-static gboolean break_tick(gpointer);
+/* The current mode. */
+static enum mode mode = MODE_WORK;
+
+static gboolean tick(gpointer);
 
 /* Update the timer in the break window. */
 static void update_timer(void)
@@ -79,43 +88,61 @@ static void update_timer(void)
 
 	gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(timer),
 		1.0 - (gdouble) remaining_seconds / cyclep->break_duration);
-	gtk_progress_bar_set_text(GTK_PROGRESS_BAR(timer),
-		label);
+	gtk_progress_bar_set_text(GTK_PROGRESS_BAR(timer), label);
+}
+
+/* Start work. */
+static void start_work(void)
+{
+	mode = MODE_WORK;
+	remaining_seconds = cycles[current_cycle_index].work_duration;
+	gtk_widget_hide(window);
 }
 
 /* Start a break. */
-static gboolean start_break(gpointer data)
+static void start_break(void)
 {
-	(void)data;
-
+	mode = MODE_BREAK;
 	remaining_seconds = cycles[current_cycle_index].break_duration;
+	penalty_seconds = 0;
+	update_timer();
 	gtk_widget_show_all(window);
 	gdk_keyboard_grab(window->window, TRUE, GDK_CURRENT_TIME);
-	update_timer();
-
-	g_timeout_add_seconds(1, break_tick, NULL);
-
-	return FALSE;
 }
 
-/* Step the timer during a break. */
-static gboolean break_tick(gpointer data)
+/* Go to the next cycle. */
+static void next_cycle(void)
 {
-	gboolean continue_ticking;
+	current_cycle_index = (current_cycle_index + 1) % cycles_count;
+}
 
-	(void)data;
 
-	if (penalty_seconds) {
-		penalty_seconds--;
-		continue_ticking = TRUE;
-	} else {
-		remaining_seconds--;
-		continue_ticking = (remaining_seconds != 0);
+/* Step the timer during work or a break. */
+static gboolean tick(gpointer data)
+{
+	unused(data);
+
+	switch (mode) {
+	case MODE_WORK:
+		if (remaining_seconds) {
+			remaining_seconds--;
+		} else {
+			start_break();
+		}
+		break;
+
+	case MODE_BREAK:
+		if (penalty_seconds) {
+			penalty_seconds--;
+		} else if (remaining_seconds) {
+			remaining_seconds--;
+		}
+
+		update_timer();
+		break;
 	}
 
-	update_timer();
-
-	return continue_ticking;
+	return TRUE;
 }
 
 /* Handle input during a break.
@@ -129,14 +156,8 @@ static gboolean handle_input(GtkWidget *widget, GdkEvent *event, gpointer *data)
 	unused(data);
 
 	if (remaining_seconds == 0) {
-		gtk_widget_hide(window);
-
-		if(++current_cycle_index == cycles_count) {
-			current_cycle_index = 0;
-		}
-
-		g_timeout_add_seconds(cycles[current_cycle_index].work_duration, start_break, NULL);
-
+		next_cycle();
+		start_work();
 		return FALSE;
 	} else {
 		penalty_seconds = default_penalty_seconds;
@@ -215,7 +236,7 @@ int main(int argc, char *argv[])
 	gtk_container_add(GTK_CONTAINER(alignment), timer);
 	gtk_container_add(GTK_CONTAINER(window), alignment);
 
-	g_timeout_add_seconds(cycles[0].work_duration, start_break, NULL);
+	g_timeout_add_seconds(1, tick, NULL);
 
 	gtk_main();
 
